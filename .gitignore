@@ -1,0 +1,16 @@
+# Built binaries / test drivers
+*.exe
+*.exe~
+*.out
+*.test
+
+# Debug artifacts
+*.netlog
+*.log
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# NOTE: internal/native/*.flate is the embedded engine and IS committed.
