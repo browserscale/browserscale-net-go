@@ -1,6 +1,9 @@
 package browserscalenet
 
-import "io"
+import (
+	"io"
+	"strings"
+)
 
 // Field is a single header as a {name, value} pair. It is an array rather than
 // a struct so that ordered literals like Header{{"user-agent", ua}} stay
@@ -24,21 +27,38 @@ func (h Header) Add(name, value string) Header {
 	return append(h, Field{name, value})
 }
 
-// Get returns the value of the first field whose name matches (case-sensitive),
-// and whether it was found.
+// Get returns the value of the first field whose name matches, and whether it
+// was found. Names compare case-insensitively, as HTTP defines them: HTTP/2
+// delivers response headers lower-cased, so Get("Content-Type") finds
+// "content-type".
 func (h Header) Get(name string) (string, bool) {
 	for _, f := range h {
-		if f[0] == name {
+		if strings.EqualFold(f[0], name) {
 			return f[1], true
 		}
 	}
 	return "", false
 }
 
+// Values returns the values of every field whose name matches
+// case-insensitively, in order — e.g. all set-cookie lines of a response.
+func (h Header) Values(name string) []string {
+	var out []string
+	for _, f := range h {
+		if strings.EqualFold(f[0], name) {
+			out = append(out, f[1])
+		}
+	}
+	return out
+}
+
 // Request is a single HTTP request. The engine sends Method, URL and Header
-// as-is; it never adds headers of its own, so include everything the origin
-// should see (user-agent, accept, content-length for a body, …) in Header, in
-// the order you want them on the wire.
+// as-is, so include everything the origin should see (user-agent, accept, …)
+// in Header, in the order you want them on the wire. The only headers added are
+// the transport ones the browser's stack always sets: Host (HTTP/2 uses
+// :authority from the URL instead), Connection and Content-Length or
+// Transfer-Encoding for a body, placed first as the browser places them. A
+// field of the same name in Header replaces them, at your position.
 type Request struct {
 	// Method is the HTTP method, e.g. "GET" or "POST".
 	Method string
@@ -50,8 +70,7 @@ type Request struct {
 	Header Header
 
 	// Body is the optional request body. It is read fully before the request is
-	// sent; set a matching content-length header yourself if the origin needs
-	// one.
+	// sent, and Content-Length is set from its size.
 	Body io.Reader
 
 	// Partition isolates the connection pool and TLS session cache under a key

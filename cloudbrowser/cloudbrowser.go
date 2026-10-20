@@ -51,18 +51,27 @@ func FromCloudBrowser(ctx context.Context, b *browserscale.CloudBrowser) (*Profi
 		return nil, err
 	}
 
-	client, err := bsnet.New(bsnet.Options{Proxy: proxyURL(id.Proxy)})
+	jar := bsnet.NewJar()
+	jar.Set(toNetCookies(id.Cookies)...)
+
+	header := identityToHeader(id)
+
+	// Wire the jar and identity into the client so bsnet.AUTO resolves on its own:
+	// {"cookie", bsnet.AUTO} fills from the jar, {"user-agent", bsnet.AUTO} and the
+	// other identity headers fill from Defaults, and responses fold back into the jar.
+	client, err := bsnet.New(bsnet.Options{
+		Proxy:    proxyURL(id.Proxy),
+		Jar:      jar,
+		Defaults: header,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	jar := bsnet.NewJar()
-	jar.Set(toNetCookies(id.Cookies)...)
-
 	return &Profile{
 		Client:   client,
 		Jar:      jar,
-		Header:   identityToHeader(id),
+		Header:   header,
 		Identity: id,
 	}, nil
 }

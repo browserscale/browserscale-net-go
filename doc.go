@@ -4,10 +4,13 @@
 // indistinguishable from one the browser made.
 //
 // Unlike [net/http], nothing is added behind your back. The method, the header
-// fields in the exact order and case you give them, and the body go out as-is.
-// Cookies, redirects, content decoding and caching are yours to handle (the
-// chrome subpackage has helpers for the common cases). What the library owns is
-// everything below the request: TLS, HTTP/2, pooling, proxies and DNS.
+// fields in the exact order and case you give them, and the body go out as-is;
+// the only additions are the transport headers the browser's stack always sets
+// (Host, Connection, Content-Length).
+// Redirects and caching are yours to handle, cookies too unless you attach a
+// [Jar]. Response bodies are decoded per Content-Encoding with Chromium's own
+// decoders. What the library owns is everything below the request: TLS,
+// HTTP/2, pooling, proxies and DNS.
 //
 // The engine is a native library (wrc_net) built from the same Chromium tree as
 // the browser. It is loaded at run time; today only windows/amd64 ships a

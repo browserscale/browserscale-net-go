@@ -8,8 +8,9 @@ import (
 )
 
 // Response is the result of a request. Header is in the exact order the origin
-// sent it. Body streams the raw response bytes — no automatic gzip/brotli/zstd
-// decoding is done, so if you sent accept-encoding you must decode yourself.
+// sent it. Body streams the response decoded per Content-Encoding (gzip,
+// deflate, br, zstd), the way the browser decodes it, unless the client was
+// created with DisableDecompression.
 type Response struct {
 	// Status is the HTTP status code.
 	Status int

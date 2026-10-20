@@ -32,9 +32,28 @@ type Options struct {
 	// it at the default unless you have a reason not to.
 	DisableECH bool
 
+	// DisableDecompression hands out response bodies exactly as received. By
+	// default bodies are decoded per Content-Encoding (gzip, deflate, br, zstd)
+	// with the browser's own decoders, so sending the browser's accept-encoding
+	// header costs you nothing. The content-encoding response header is left in
+	// place either way.
+	DisableDecompression bool
+
 	// H2 optionally overrides HTTP/2 settings. Leave nil for the browser's
 	// defaults (recommended; changing these alters the fingerprint).
 	H2 map[string]any
+
+	// Jar, if set, is the cookie store the client uses. With a jar attached, Do
+	// fills any {"cookie", AUTO} header from it for the request URL and folds the
+	// response's set-cookie headers back into it automatically — attach a jar and
+	// forget. Leave nil to manage cookies yourself.
+	Jar *Jar
+
+	// Defaults are the values AUTO resolves to for non-cookie headers, matched by
+	// name case-insensitively (e.g. user-agent, accept-language, the sec-ch-ua
+	// family). They are only used to fill AUTO fields; nothing here is added to a
+	// request on its own. Typically the browser's identity headers.
+	Defaults Header
 }
 
 // InitConfig is one-time, process-wide engine configuration. It takes effect on
@@ -47,13 +66,16 @@ type InitConfig struct {
 // Client issues requests through the native engine. It is safe for concurrent
 // use by multiple goroutines.
 type Client struct {
-	h uintptr
+	h        uintptr
+	jar      *Jar
+	defaults map[string]string
 }
 
 type clientConfig struct {
 	Proxy            string         `json:"proxy,omitempty"`
 	ConnectUserAgent string         `json:"connect_user_agent,omitempty"`
 	TLS              tlsConfig      `json:"tls"`
+	Decode           bool           `json:"decode"`
 	H2               map[string]any `json:"h2,omitempty"`
 }
 
@@ -82,6 +104,7 @@ func NewWithInit(opts Options, init InitConfig) (*Client, error) {
 	cfg := clientConfig{
 		ConnectUserAgent: opts.ConnectUserAgent,
 		TLS:              tlsConfig{Verify: !opts.InsecureSkipVerify, ECH: !opts.DisableECH},
+		Decode:           !opts.DisableDecompression,
 		H2:               opts.H2,
 	}
 
@@ -115,7 +138,7 @@ func NewWithInit(opts Options, init InitConfig) (*Client, error) {
 			return nil, err
 		}
 	}
-	return &Client{h: h}, nil
+	return &Client{h: h, jar: opts.Jar, defaults: buildDefaults(opts.Defaults)}, nil
 }
 
 // Close releases the client's connections and resources. The client must not be
@@ -148,10 +171,12 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		body = b
 	}
 
+	header := resolveAuto(req.Header, c.jar, c.defaults, req.URL)
+
 	opts := native.StartOpts{
 		Method:      method,
 		URL:         req.URL,
-		Fields:      toNativeFields(req.Header),
+		Fields:      toNativeFields(header),
 		Body:        body,
 		Priority:    req.Priority,
 		PrioritySet: req.PrioritySet,
@@ -171,13 +196,17 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		return nil, err
 	}
 
-	return &Response{
+	resp := &Response{
 		Status: status,
 		Proto:  proto,
 		Header: fromNativeFields(fields),
 		Conn:   parseConn(connJSON),
 		Body:   &Body{ctx: ctx, req: r},
-	}, nil
+	}
+	if c.jar != nil {
+		c.jar.SetFromResponse(req.URL, resp)
+	}
+	return resp, nil
 }
 
 func toNativeFields(h Header) []native.HeaderField {
