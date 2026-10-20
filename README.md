@@ -115,7 +115,11 @@ resp, _ := c.Do(ctx, &bsnet.Request{
 
 ## Continuing a cloud-browser session
 
-The `cloudbrowser` subpackage turns a live browserscale cloud browser into a request client that keeps the session going — same proxy, same cookies, same identity. It wires the jar and identity in for you, so every header can be `AUTO`:
+The `cloudbrowser` subpackage turns a live browserscale cloud browser into a request client that keeps the session going — same proxy, same cookies, same identity. It wires the jar and identity in for you, so every header can be `AUTO`. It's a module of its own, so the core stays free of the SDK's dependencies:
+
+```bash
+go get github.com/browserscale/browserscale-net-go/cloudbrowser
+```
 
 ```go
 import (
