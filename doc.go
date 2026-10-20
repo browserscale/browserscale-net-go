@@ -17,7 +17,8 @@
 // binary, and other platforms return [ErrUnsupportedPlatform].
 //
 // A [Client] is one browser profile: its own connection pool, TLS session
-// cache, proxy and auth state. Create one per identity.
+// cache, proxy and auth state. Create one per identity, or carry on a running
+// browserscale session with [FromCloudBrowser].
 //
 //	c, err := browserscalenet.New(browserscalenet.Options{
 //	    Proxy: "http://user:pass@gw.example:7000",

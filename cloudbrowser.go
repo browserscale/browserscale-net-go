@@ -1,13 +1,4 @@
-// Package cloudbrowser bridges a live browserscale cloud browser to a
-// request-based [bsnet.Client], so you can start cheap request traffic that
-// continues the browser's session: same proxy exit, same cookies, same
-// User-Agent and client hints.
-//
-// It lives in its own module on purpose. The bridge pulls in the browserscale
-// Go SDK (and its gRPC dependencies), while the core browserscale-net module
-// stays dependency-free — only code that actually wires a cloud browser to the
-// request client pays for the SDK.
-package cloudbrowser
+package browserscalenet
 
 import (
 	"context"
@@ -17,32 +8,32 @@ import (
 	"time"
 
 	browserscale "github.com/browserscale/browserscale-go"
-	bsnet "github.com/browserscale/browserscale-net-go"
 )
 
 // Profile is a request client seeded from a cloud browser session, together
 // with the state needed to keep requests consistent with it.
 type Profile struct {
 	// Client is a request client configured with the session's proxy.
-	Client *bsnet.Client
+	Client *Client
 
 	// Jar holds the session's cookies. Use Jar.Cookie(url) to get the cookie
 	// header for a request and Jar.SetFromResponse after it.
-	Jar *bsnet.Jar
+	Jar *Jar
 
 	// Header is an ordered template of the browser's identity headers
 	// (sec-ch-ua family, user-agent, accept-language). Merge it into each
 	// request's header in the order you want on the wire.
-	Header bsnet.Header
+	Header Header
 
 	// Identity is the full client identity the profile was built from.
 	Identity *browserscale.ClientIdentity
 }
 
-// FromCloudBrowser builds a Profile from a running session in a single call: it
-// reads the session's identity (User-Agent, client hints, Accept-Language),
-// proxy and cookies, and returns a request client wired to the same proxy with
-// the cookies loaded. Just hand it the CloudBrowser.
+// FromCloudBrowser builds a Profile from a running browserscale session in a
+// single call, so request traffic continues the browser's session: it reads
+// the session's identity (User-Agent, client hints, Accept-Language), proxy and
+// cookies, and returns a request client wired to the same proxy exit with the
+// cookies loaded.
 //
 // The returned Client owns resources; call Profile.Close when done.
 func FromCloudBrowser(ctx context.Context, b *browserscale.CloudBrowser) (*Profile, error) {
@@ -51,15 +42,15 @@ func FromCloudBrowser(ctx context.Context, b *browserscale.CloudBrowser) (*Profi
 		return nil, err
 	}
 
-	jar := bsnet.NewJar()
+	jar := NewJar()
 	jar.Set(toNetCookies(id.Cookies)...)
 
 	header := identityToHeader(id)
 
-	// Wire the jar and identity into the client so bsnet.AUTO resolves on its own:
-	// {"cookie", bsnet.AUTO} fills from the jar, {"user-agent", bsnet.AUTO} and the
-	// other identity headers fill from Defaults, and responses fold back into the jar.
-	client, err := bsnet.New(bsnet.Options{
+	// Wire the jar and identity into the client so AUTO resolves on its own:
+	// {"cookie", AUTO} fills from the jar, {"user-agent", AUTO} and the other
+	// identity headers fill from Defaults, and responses fold back into the jar.
+	client, err := New(Options{
 		Proxy:    proxyURL(id.Proxy),
 		Jar:      jar,
 		Defaults: header,
@@ -84,7 +75,7 @@ func (p *Profile) Close() {
 	}
 }
 
-// proxyURL turns the session's proxy into a URL for bsnet.Options. MASQUE is
+// proxyURL turns the session's proxy into a URL for Options. MASQUE is
 // ignored: browserscale-net is HTTP/1.1 + HTTP/2 only for now. Empty host =>
 // direct connection.
 func proxyURL(p browserscale.ProxyConfig) string {
@@ -106,8 +97,8 @@ func proxyURL(p browserscale.ProxyConfig) string {
 // request, in Chrome's order. High-entropy hints (sec-ch-ua-arch,
 // -full-version-list, …) are sent only when the origin asks via Accept-CH; add
 // them yourself from Identity when you need them.
-func identityToHeader(id *browserscale.ClientIdentity) bsnet.Header {
-	var h bsnet.Header
+func identityToHeader(id *browserscale.ClientIdentity) Header {
+	var h Header
 	if s := secCHUA(id.Brands); s != "" {
 		h = h.Add("sec-ch-ua", s)
 	}
@@ -143,10 +134,10 @@ func boolHint(v bool) string {
 	return "?0"
 }
 
-func toNetCookies(in []browserscale.CookieParam) []bsnet.Cookie {
-	out := make([]bsnet.Cookie, 0, len(in))
+func toNetCookies(in []browserscale.CookieParam) []Cookie {
+	out := make([]Cookie, 0, len(in))
 	for _, c := range in {
-		nc := bsnet.Cookie{
+		nc := Cookie{
 			Name:     c.Name,
 			Value:    c.Value,
 			Domain:   c.Domain,
