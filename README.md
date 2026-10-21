@@ -10,7 +10,7 @@ Chromium's real network stack as a Go HTTP client: the same TLS ClientHello and 
 
 [![Go Reference](https://img.shields.io/badge/go.dev-reference-0a0a0a?style=flat-square&logo=go)](https://pkg.go.dev/github.com/browserscale/browserscale-net-go)
 [![go](https://img.shields.io/badge/go-1.25%2B-0a0a0a?style=flat-square&logo=go)](https://go.dev)
-[![platform](https://img.shields.io/badge/platform-windows%2Famd64-0a0a0a?style=flat-square&logo=windows)](#requirements)
+[![platform](https://img.shields.io/badge/platform-windows%2Famd64%20%C2%B7%20macOS%2Farm64-0a0a0a?style=flat-square)](#requirements)
 
 [Docs](https://browserscale.cloud/docs) · [Quickstart](https://browserscale.cloud/docs/quickstart) · [Discord](https://discord.gg/SfE9C9K28D)
 
@@ -144,7 +144,7 @@ One call reads the session's identity, proxy and cookies, then hands back a clie
 
 ## Requirements
 
-Windows (amd64) only for now. On any other platform `New` returns `ErrUnsupportedPlatform`; more platforms are on the way.
+Windows (amd64) and macOS on Apple silicon (arm64, macOS 13 or newer). On any other platform `New` returns `ErrUnsupportedPlatform`; more platforms are on the way.
 
 Get an API key in your [panel](https://browserscale.cloud/panel/account).
 

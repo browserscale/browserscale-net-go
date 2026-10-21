@@ -1,8 +1,11 @@
 module github.com/browserscale/browserscale-net-go
 
-go 1.25
+go 1.25.0
 
-require github.com/browserscale/browserscale-go v1.12.0
+require (
+	github.com/browserscale/browserscale-go v1.12.0
+	github.com/ebitengine/purego v0.11.2
+)
 
 require (
 	golang.org/x/net v0.31.0 // indirect

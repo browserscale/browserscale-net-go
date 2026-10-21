@@ -1,4 +1,4 @@
-//go:build windows && amd64
+//go:build (windows && amd64) || (darwin && arm64)
 
 package native
 
@@ -7,7 +7,6 @@ import (
 	"compress/flate"
 	"context"
 	"crypto/sha256"
-	_ "embed"
 	"encoding/hex"
 	"io"
 	"os"
@@ -15,17 +14,15 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"unsafe"
 )
 
-// wrc_net.dll, DEFLATE-compressed, produced by tools/pack.go from the Chromium
-// build output. Content-addressed on extraction, so go.sum covers integrity.
-//
-//go:embed wrc_net_windows_amd64.dll.flate
-var dllCompressed []byte
+// Each platform's file embeds the engine as libCompressed, DEFLATE-compressed
+// by tools/pack.go from the Chromium build output, names it libName, and
+// provides openLibrary and call. Content-addressed on extraction, so go.sum
+// covers integrity.
 
-// ─── C ABI structs (mirror wrc_net.h; amd64 layout) ──────────────────────────
+// ─── C ABI structs (mirror wrc_net.h; same layout on amd64 and arm64) ────────
 
 type wrcBytes struct {
 	p uintptr
@@ -78,26 +75,38 @@ const (
 
 // ─── Loaded procs ────────────────────────────────────────────────────────────
 
+// proc is the address of one of the engine's functions.
+type proc uintptr
+
+// Call calls the function with integer and pointer arguments; the result is
+// the full return register, so callers narrow int results themselves. Like
+// syscall.Proc.Call, pointers converted to uintptr in the call's arguments
+// stay on the heap and alive until it returns.
+//
+//go:uintptrescapes
+func (f proc) Call(args ...uintptr) (uintptr, uintptr, error) {
+	return call(uintptr(f), args...), 0, nil
+}
+
 type procs struct {
-	dll           *syscall.DLL
-	initFn        *syscall.Proc
-	version       *syscall.Proc
-	errorName     *syscall.Proc
-	free          *syscall.Proc
-	clientNew     *syscall.Proc
-	setProxyAuth  *syscall.Proc
-	clientClose   *syscall.Proc
-	requestStart  *syscall.Proc
-	requestWrite  *syscall.Proc
-	requestFinish *syscall.Proc
-	requestStatus *syscall.Proc
-	requestFields *syscall.Proc
-	requestConn   *syscall.Proc
-	requestRead   *syscall.Proc
-	requestCancel *syscall.Proc
-	requestFree   *syscall.Proc
-	poll          *syscall.Proc
-	wakeup        *syscall.Proc
+	initFn        proc
+	version       proc
+	errorName     proc
+	free          proc
+	clientNew     proc
+	setProxyAuth  proc
+	clientClose   proc
+	requestStart  proc
+	requestWrite  proc
+	requestFinish proc
+	requestStatus proc
+	requestFields proc
+	requestConn   proc
+	requestRead   proc
+	requestCancel proc
+	requestFree   proc
+	poll          proc
+	wakeup        proc
 }
 
 var (
@@ -118,23 +127,22 @@ func Init(configJSON string) error {
 }
 
 func doInit(configJSON string) error {
-	path, err := extractDLL()
+	path, err := extractLibrary()
 	if err != nil {
 		return err
 	}
-	dll, err := syscall.LoadDLL(path)
+	lookup, err := openLibrary(path)
 	if err != nil {
 		return err
 	}
-	find := func(name string) *syscall.Proc {
-		proc, e := dll.FindProc(name)
+	find := func(name string) proc {
+		addr, e := lookup(name)
 		if e != nil && err == nil {
 			err = e
 		}
-		return proc
+		return proc(addr)
 	}
 	p = &procs{
-		dll:           dll,
 		initFn:        find("wrc_init"),
 		version:       find("wrc_version"),
 		errorName:     find("wrc_error_name"),
@@ -168,10 +176,10 @@ func doInit(configJSON string) error {
 	return nil
 }
 
-// extractDLL decompresses the embedded engine into a content-addressed cache
-// directory and returns its path, writing it only if missing or altered.
-func extractDLL() (string, error) {
-	zr := flate.NewReader(bytes.NewReader(dllCompressed))
+// extractLibrary decompresses the embedded engine into a content-addressed
+// cache directory and returns its path, writing it only if missing or altered.
+func extractLibrary() (string, error) {
+	zr := flate.NewReader(bytes.NewReader(libCompressed))
 	raw, err := io.ReadAll(zr)
 	_ = zr.Close()
 	if err != nil {
@@ -185,7 +193,7 @@ func extractDLL() (string, error) {
 		base = os.TempDir()
 	}
 	dir := filepath.Join(base, "browserscale", "net", hexSum)
-	path := filepath.Join(dir, "wrc_net.dll")
+	path := filepath.Join(dir, libName)
 
 	if existing, e := os.ReadFile(path); e == nil {
 		if s := sha256.Sum256(existing); s == sum {
@@ -541,7 +549,7 @@ func (r *Req) signalReadable() {
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 func errorName(code int) string {
-	if p == nil || p.errorName == nil {
+	if p == nil || p.errorName == 0 {
 		return ""
 	}
 	r, _, _ := p.errorName.Call(uintptr(code))

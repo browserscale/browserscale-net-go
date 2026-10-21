@@ -7,7 +7,7 @@ import (
 )
 
 // ErrUnsupportedPlatform is returned when no native engine is available for the
-// current OS/arch. Only windows/amd64 ships a binary today.
+// current OS/arch. windows/amd64 and darwin/arm64 ship a binary today.
 var ErrUnsupportedPlatform = native.ErrUnsupportedPlatform
 
 // NetError is a Chromium net error (negative code plus its symbolic name, e.g.

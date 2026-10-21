@@ -7,7 +7,7 @@ import "errors"
 
 // ErrUnsupportedPlatform is returned by [Init] on any platform for which no
 // wrc_net binary is embedded.
-var ErrUnsupportedPlatform = errors.New("browserscale-net: no native engine for this OS/arch (windows/amd64 only for now)")
+var ErrUnsupportedPlatform = errors.New("browserscale-net: no native engine for this OS/arch (windows/amd64 and darwin/arm64 for now)")
 
 // HeaderField is one request or response header, kept as raw strings so order
 // and case survive the round trip.

@@ -13,8 +13,9 @@
 // HTTP/2, pooling, proxies and DNS.
 //
 // The engine is a native library (wrc_net) built from the same Chromium tree as
-// the browser. It is loaded at run time; today only windows/amd64 ships a
-// binary, and other platforms return [ErrUnsupportedPlatform].
+// the browser. It is loaded at run time, without cgo; windows/amd64 and
+// darwin/arm64 ship a binary, and other platforms return
+// [ErrUnsupportedPlatform].
 //
 // A [Client] is one browser profile: its own connection pool, TLS session
 // cache, proxy and auth state. Create one per identity, or carry on a running
