@@ -5,6 +5,7 @@ package native
 import (
 	_ "embed"
 	"syscall"
+	"unsafe"
 )
 
 //go:embed wrc_net_windows_amd64.dll.flate
@@ -29,4 +30,13 @@ func openLibrary(path string) (func(name string) (uintptr, error), error) {
 func call(fn uintptr, args ...uintptr) uintptr {
 	r, _, _ := syscall.SyscallN(fn, args...)
 	return r
+}
+
+// The Windows x64 ABI passes a struct larger than 8 bytes as a pointer to a
+// copy, so each wrc_bytes argument is one pointer.
+func setProxyAuth(client uintptr, user, pass wrcBytes) uintptr {
+	rc, _, _ := p.setProxyAuth.Call(client,
+		uintptr(unsafe.Pointer(&user)),
+		uintptr(unsafe.Pointer(&pass)))
+	return rc
 }

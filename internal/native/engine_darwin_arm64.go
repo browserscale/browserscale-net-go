@@ -29,3 +29,10 @@ func call(fn uintptr, args ...uintptr) uintptr {
 	r, _, _ := purego.SyscallN(fn, args...)
 	return r
 }
+
+// AAPCS64 passes a 16-byte struct in two registers, so each wrc_bytes
+// argument is its pointer and its length.
+func setProxyAuth(client uintptr, user, pass wrcBytes) uintptr {
+	rc, _, _ := p.setProxyAuth.Call(client, user.p, user.n, pass.p, pass.n)
+	return rc
+}

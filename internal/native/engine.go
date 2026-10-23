@@ -260,11 +260,7 @@ func (e *clientError) Error() string { return "browserscale-net: " + e.msg }
 func SetProxyAuth(client uintptr, user, pass string) error {
 	ub := []byte(user)
 	pb := []byte(pass)
-	uw := bytesOf(ub)
-	pw := bytesOf(pb)
-	rc, _, _ := p.setProxyAuth.Call(client,
-		uintptr(unsafe.Pointer(&uw)),
-		uintptr(unsafe.Pointer(&pw)))
+	rc := setProxyAuth(client, bytesOf(ub), bytesOf(pb))
 	keepAlive(ub, pb)
 	if int32(rc) != 0 {
 		return &NetError{Code: int32ToInt(rc), Name: errorName(int32ToInt(rc))}
