@@ -66,6 +66,10 @@ type Options struct {
 	// name case-insensitively (e.g. user-agent, accept-language, the sec-ch-ua
 	// family). They are only used to fill AUTO fields; nothing here is added to a
 	// request on its own. Typically the browser's identity headers.
+	//
+	// Leave it empty and AUTO fills the identity headers with what Google Chrome
+	// of the engine's version sends; a value here takes the place of that one
+	// header.
 	Defaults Header
 }
 
@@ -82,6 +86,7 @@ type Client struct {
 	h        uintptr
 	jar      *Jar
 	defaults map[string]string
+	engine   *engineIdentity
 }
 
 type clientConfig struct {
@@ -164,7 +169,7 @@ func NewWithInit(opts Options, init InitConfig) (*Client, error) {
 			return nil, err
 		}
 	}
-	return &Client{h: h, jar: opts.Jar, defaults: buildDefaults(opts.Defaults)}, nil
+	return &Client{h: h, jar: opts.Jar, defaults: buildDefaults(opts.Defaults), engine: identityOfLoadedEngine()}, nil
 }
 
 // Close releases the client's connections and resources. The client must not be
@@ -197,7 +202,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		body = b
 	}
 
-	header := resolveAuto(req.Header, c.jar, c.defaults, req.URL)
+	header := resolveAuto(req.Header, c.jar, c.defaults, c.engine, req.URL)
 
 	opts := native.StartOpts{
 		Method:      method,

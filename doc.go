@@ -33,9 +33,9 @@
 //	    Method: "GET",
 //	    URL:    "https://example.com/",
 //	    Header: browserscalenet.Header{
-//	        {"user-agent", ua},
+//	        {"user-agent", browserscalenet.AUTO}, // Chrome's, of the engine's version
 //	        {"accept", "*/*"},
-//	        {"accept-encoding", "identity"},
+//	        {"accept-encoding", browserscalenet.AUTO},
 //	    },
 //	})
 //	if err != nil {

@@ -44,18 +44,19 @@ func main() {
 	}
 	defer c.Close()
 
-	// Your headers go out in the exact order and case you write them.
+	// Your headers go out in the exact order and case you write them. AUTO is
+	// filled with what Google Chrome of the engine's version sends.
 	resp, err := c.Do(context.Background(), &bsnet.Request{
 		Method: "GET",
 		URL:    "https://tls.peet.ws/api/all",
 		Header: bsnet.Header{
-			{"sec-ch-ua", `"Chromium";v="155", "Not;A=Brand";v="24"`},
-			{"sec-ch-ua-mobile", "?0"},
-			{"sec-ch-ua-platform", `"Windows"`},
-			{"user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36"},
+			{"sec-ch-ua", bsnet.AUTO},
+			{"sec-ch-ua-mobile", bsnet.AUTO},
+			{"sec-ch-ua-platform", bsnet.AUTO},
+			{"user-agent", bsnet.AUTO},
 			{"accept", "*/*"},
-			{"accept-encoding", "gzip, deflate, br, zstd"}, // decoded for you
-			{"accept-language", "en-US,en;q=0.9"},
+			{"accept-encoding", bsnet.AUTO}, // decoded for you
+			{"accept-language", bsnet.AUTO},
 		},
 	})
 	if err != nil {
@@ -84,7 +85,7 @@ The engine ships inside the package — nothing to install, no cgo. Go 1.25+.
 
 ## Let the client fill a header: `AUTO`
 
-Order is yours, but you don't have to carry the values. Give a client a cookie `Jar` and a set of `Defaults`, then drop `bsnet.AUTO` in as a header value and the client fills it in Go, right before the request goes out:
+Order is yours, but you don't have to carry the values. Drop `bsnet.AUTO` in as a header value and the client fills it in Go, right before the request goes out. On its own it fills the identity headers with what Google Chrome of the engine's version sends on Windows — `user-agent`, `sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform`, `accept-language` and `accept-encoding` — so the headers always match the TLS and HTTP/2 underneath, and move with the engine when it updates. That is the Windows browser on macOS too, because the engine is the same one everywhere. Give the client a cookie `Jar` to have `cookie` filled too, and `Defaults` for any value you want to be different:
 
 ```go
 jar := bsnet.NewJar()
@@ -93,26 +94,24 @@ jar.Set(/* seed the session's cookies */)
 c, _ := bsnet.New(bsnet.Options{
 	Proxy: proxy,
 	Jar:   jar,
-	Defaults: bsnet.Header{ // values AUTO resolves to, by name
-		{"user-agent", ua},
-		{"accept-language", "en-US,en;q=0.9"},
-		{"sec-ch-ua", secCHUA},
+	Defaults: bsnet.Header{ // values that take the place of Chrome's, by name
+		{"accept-language", "de-DE,de;q=0.9,en;q=0.8"},
 	},
 })
 
 resp, _ := c.Do(ctx, &bsnet.Request{
 	URL: url,
 	Header: bsnet.Header{
-		{"sec-ch-ua", bsnet.AUTO},       // from Defaults
+		{"sec-ch-ua", bsnet.AUTO},       // Chrome's
 		{"cookie", bsnet.AUTO},          // from the Jar, for this URL
-		{"user-agent", bsnet.AUTO},      // from Defaults
+		{"user-agent", bsnet.AUTO},      // Chrome's
 		{"accept", "*/*"},               // or just write it
-		{"accept-language", bsnet.AUTO},
+		{"accept-language", bsnet.AUTO}, // from Defaults
 	},
 })
 ```
 
-`cookie` is filled from the jar for the request URL; every other `AUTO` header is filled from `Defaults`, matched by name **case-insensitively** (so `"Cookie"` and `"cookie"` both work, HTTP/1.1- or HTTP/2-style). `AUTO` only ever replaces the *value* — the field's name, case and **position stay exactly where you put them**. If there's nothing to fill it with, the field is dropped, so a literal `AUTO` or an empty header never reaches the wire. With a jar attached, the client also folds each response's `set-cookie` back into it automatically — attach a jar and forget.
+`cookie` is filled from the jar for the request URL; every other `AUTO` header is filled from `Defaults` and, where `Defaults` has no value, with Chrome's. Names match **case-insensitively** (so `"Cookie"` and `"cookie"` both work, HTTP/1.1- or HTTP/2-style). `AUTO` only ever replaces the *value* — the field's name, case and **position stay exactly where you put them**. If there's nothing to fill it with, the field is dropped, so a literal `AUTO` or an empty header never reaches the wire; that goes for headers that depend on the kind of request, such as `accept` or the `sec-fetch` family, and, as in Chrome, for the `sec-ch-ua` headers on plain HTTP. With a jar attached, the client also folds each response's `set-cookie` back into it automatically — attach a jar and forget.
 
 ## Continuing a cloud-browser session
 

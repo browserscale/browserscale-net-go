@@ -18,7 +18,7 @@ func TestResolveAuto(t *testing.T) {
 			{"User-Agent", AUTO}, // filled from defaults by lower-cased name
 			{"accept", "*/*"},
 		}
-		got := resolveAuto(in, jar, defaults, url)
+		got := resolveAuto(in, jar, defaults, nil, url)
 		want := Header{
 			{"sec-ch-ua", `"x";v="1"`},
 			{"Cookie", "sid=abc"},
@@ -29,25 +29,25 @@ func TestResolveAuto(t *testing.T) {
 	})
 
 	t.Run("drops cookie when jar has nothing for the url", func(t *testing.T) {
-		got := resolveAuto(Header{{"cookie", AUTO}, {"accept", "*/*"}}, jar, defaults, "https://other.com/")
+		got := resolveAuto(Header{{"cookie", AUTO}, {"accept", "*/*"}}, jar, defaults, nil, "https://other.com/")
 		assertHeader(t, got, Header{{"accept", "*/*"}})
 	})
 
 	t.Run("drops unknown auto header not in defaults", func(t *testing.T) {
-		got := resolveAuto(Header{{"x-custom", AUTO}, {"accept", "*/*"}}, jar, defaults, url)
+		got := resolveAuto(Header{{"x-custom", AUTO}, {"accept", "*/*"}}, jar, defaults, nil, url)
 		assertHeader(t, got, Header{{"accept", "*/*"}})
 	})
 
 	t.Run("no AUTO returns the input unchanged without allocating", func(t *testing.T) {
 		in := Header{{"user-agent", "literal"}, {"accept", "*/*"}}
-		got := resolveAuto(in, jar, defaults, url)
+		got := resolveAuto(in, jar, defaults, nil, url)
 		if &got[0] != &in[0] {
 			t.Fatalf("expected input slice to be returned as-is")
 		}
 	})
 
 	t.Run("nil jar and nil defaults just drop every AUTO", func(t *testing.T) {
-		got := resolveAuto(Header{{"cookie", AUTO}, {"user-agent", AUTO}, {"accept", "*/*"}}, nil, nil, url)
+		got := resolveAuto(Header{{"cookie", AUTO}, {"user-agent", AUTO}, {"accept", "*/*"}}, nil, nil, nil, url)
 		assertHeader(t, got, Header{{"accept", "*/*"}})
 	})
 }
