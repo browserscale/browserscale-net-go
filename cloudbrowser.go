@@ -51,9 +51,10 @@ func FromCloudBrowser(ctx context.Context, b *browserscale.CloudBrowser) (*Profi
 	// {"cookie", AUTO} fills from the jar, {"user-agent", AUTO} and the other
 	// identity headers fill from Defaults, and responses fold back into the jar.
 	client, err := New(Options{
-		Proxy:    proxyURL(id.Proxy),
-		Jar:      jar,
-		Defaults: header,
+		Proxy:       proxyURL(id.Proxy),
+		MasqueProxy: masqueProxy(id.Proxy),
+		Jar:         jar,
+		Defaults:    header,
 	})
 	if err != nil {
 		return nil, err
@@ -75,8 +76,17 @@ func (p *Profile) Close() {
 	}
 }
 
-// proxyURL turns the session's proxy into a URL for Options. MASQUE is
-// ignored: browserscale-net is HTTP/1.1 + HTTP/2 only for now. Empty host =>
+// masqueProxy is the session's MASQUE proxy for Options, so the client takes
+// HTTP/3 where the browser does. Without a proxy there is nothing for it to
+// stand next to.
+func masqueProxy(p browserscale.ProxyConfig) string {
+	if p.Host == "" {
+		return ""
+	}
+	return p.Masque
+}
+
+// proxyURL turns the session's proxy into a URL for Options. Empty host =>
 // direct connection.
 func proxyURL(p browserscale.ProxyConfig) string {
 	if p.Host == "" {

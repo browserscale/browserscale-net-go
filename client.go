@@ -3,9 +3,12 @@ package browserscalenet
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
+	"strconv"
 
 	"github.com/browserscale/browserscale-net-go/internal/native"
 )
@@ -16,7 +19,17 @@ type Options struct {
 	// Proxy routes all traffic through an HTTP or SOCKS proxy, e.g.
 	// "http://user:pass@gw.example:7000" or "socks5://host:1080". Credentials in
 	// the URL are sent preemptively. Empty means a direct connection.
+	//
+	// HTTP/3 is used as the browser uses it: directly, and through a SOCKS5
+	// proxy over its UDP relay (UDP ASSOCIATE). An HTTP proxy cannot carry it,
+	// so requests through one stay on HTTP/2 unless MasqueProxy is set.
 	Proxy string
+
+	// MasqueProxy is the "host:port" of a MASQUE proxy (CONNECT-UDP, RFC 9298)
+	// that carries HTTP/3 of requests sent through Proxy, as
+	// BrowserConfig.WithMasque does for a session; everything else keeps using
+	// Proxy. It gets Proxy's credentials. Requires Proxy.
+	MasqueProxy string
 
 	// ConnectUserAgent sets the User-Agent header on HTTP CONNECT tunnels to an
 	// HTTPS proxy. It does not affect request headers.
@@ -73,6 +86,7 @@ type Client struct {
 
 type clientConfig struct {
 	Proxy            string         `json:"proxy,omitempty"`
+	MasqueProxy      string         `json:"masque_proxy,omitempty"`
 	ConnectUserAgent string         `json:"connect_user_agent,omitempty"`
 	TLS              tlsConfig      `json:"tls"`
 	Decode           bool           `json:"decode"`
@@ -102,6 +116,7 @@ func NewWithInit(opts Options, init InitConfig) (*Client, error) {
 	}
 
 	cfg := clientConfig{
+		MasqueProxy:      opts.MasqueProxy,
 		ConnectUserAgent: opts.ConnectUserAgent,
 		TLS:              tlsConfig{Verify: !opts.InsecureSkipVerify, ECH: !opts.DisableECH},
 		Decode:           !opts.DisableDecompression,
@@ -122,6 +137,17 @@ func NewWithInit(opts Options, init InitConfig) (*Client, error) {
 			u.User = nil
 		}
 		cfg.Proxy = u.String()
+	}
+	if opts.MasqueProxy != "" {
+		// Checked here as well as in the engine, so the answer is the same on
+		// every platform.
+		if opts.Proxy == "" {
+			return nil, errors.New("browserscale-net: MasqueProxy requires Proxy")
+		}
+		host, port, err := net.SplitHostPort(opts.MasqueProxy)
+		if n, perr := strconv.ParseUint(port, 10, 16); err != nil || perr != nil || host == "" || n == 0 {
+			return nil, fmt.Errorf("browserscale-net: MasqueProxy must be \"host:port\", got %q", opts.MasqueProxy)
+		}
 	}
 
 	cfgJSON, err := json.Marshal(cfg)
