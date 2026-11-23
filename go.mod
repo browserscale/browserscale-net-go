@@ -3,7 +3,7 @@ module github.com/browserscale/browserscale-net-go
 go 1.25.0
 
 require (
-	github.com/browserscale/browserscale-go v1.15.0
+	github.com/browserscale/browserscale-go v1.16.0
 	github.com/ebitengine/purego v0.11.2
 )
 
